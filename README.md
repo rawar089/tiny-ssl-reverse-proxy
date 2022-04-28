@@ -15,8 +15,12 @@ Usage of tiny-ssl-reverse-proxy:
     	running behind TCP proxy (such as ELB or HAProxy)
   -cert string
     	Path to PEM certificate (default "/etc/ssl/private/cert.pem")
+  -client-tls-ver
+        tls version for client connections (default: TLS12)  	
   -flush-interval duration
     	minimum duration between flushes to the client (default: off)
+  -insecure
+        do not validate target certificate (default: off)  	
   -key string
     	Path to PEM key (default "/etc/ssl/private/key.pem")
   -listen string

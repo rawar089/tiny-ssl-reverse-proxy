@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -17,7 +18,7 @@ import (
 )
 
 // Version number
-const Version = "0.21.0"
+const Version = "0.21.1"
 
 var message = `<!DOCTYPE html><html>
 <head>
@@ -58,11 +59,28 @@ func (c *ConnectionErrorHandler) RoundTrip(req *http.Request) (*http.Response, e
 	return resp, err
 }
 
+func tlsId(version string) uint16 {
+	var tlsid uint16
+	switch version {
+	case "TLS10":
+		tlsid = tls.VersionTLS10
+	case "TLS11":
+		tlsid = tls.VersionTLS11
+	case "TLS12":
+		tlsid = tls.VersionTLS12
+	case "TLS13":
+		tlsid = tls.VersionTLS13
+	default:
+		tlsid = tls.VersionTLS12
+	}
+	return tlsid
+}
+
 func main() {
 	var (
-		listen, cert, key, where           string
-		useTLS, useLogging, behindTCPProxy bool
-		flushInterval                      time.Duration
+		listen, cert, key, where, clientTLSversion   string
+		useTLS, useLogging, behindTCPProxy, insecure bool
+		flushInterval                                time.Duration
 	)
 	flag.StringVar(&listen, "listen", ":443", "Bind address to listen on")
 	flag.StringVar(&key, "key", "/etc/ssl/private/key.pem", "Path to PEM key")
@@ -72,6 +90,8 @@ func main() {
 	flag.BoolVar(&useLogging, "logging", true, "log requests")
 	flag.BoolVar(&behindTCPProxy, "behind-tcp-proxy", false, "running behind TCP proxy (such as ELB or HAProxy)")
 	flag.DurationVar(&flushInterval, "flush-interval", 0, "minimum duration between flushes to the client (default: off)")
+	flag.BoolVar(&insecure, "insecure", false, "do not validate target certificate (default: false)")
+	flag.StringVar(&clientTLSversion, "client-tls-ver", "TLS12", "tls version for client connections (default: TLS12)")
 	oldUsage := flag.Usage
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "\n%v version %v\n\n", os.Args[0], Version)
@@ -79,15 +99,19 @@ func main() {
 	}
 	flag.Parse()
 
-	url, err := url.Parse(where)
+	targetUrl, err := url.Parse(where)
 	if err != nil {
 		log.Fatalln("Fatal parsing -where:", err)
 	}
 
-	httpProxy := httputil.NewSingleHostReverseProxy(url)
-	httpProxy.Transport = &ConnectionErrorHandler{http.DefaultTransport}
-	httpProxy.FlushInterval = flushInterval
+	httpProxy := httputil.NewSingleHostReverseProxy(targetUrl)
 
+	httpProxy.Transport = &ConnectionErrorHandler{&http.Transport{
+		TLSClientConfig: &tls.Config{
+			MinVersion:         tlsId(clientTLSversion),
+			InsecureSkipVerify: insecure,
+		}}}
+	httpProxy.FlushInterval = flushInterval
 	var handler http.Handler
 
 	handler = httpProxy
