@@ -90,8 +90,8 @@ func main() {
 	flag.BoolVar(&useLogging, "logging", true, "log requests")
 	flag.BoolVar(&behindTCPProxy, "behind-tcp-proxy", false, "running behind TCP proxy (such as ELB or HAProxy)")
 	flag.DurationVar(&flushInterval, "flush-interval", 0, "minimum duration between flushes to the client (default: off)")
-	flag.BoolVar(&insecure, "insecure", false, "no not validate where certificate")
-	flag.StringVar(&clientTLSversion, "client-tls-ver", "TLS12", "use this tls version for client connections (default: TLS12")
+	flag.BoolVar(&insecure, "insecure", false, "do not validate target certificate (default: false)")
+	flag.StringVar(&clientTLSversion, "client-tls-ver", "TLS12", "tls version for client connections (default: TLS12)")
 	oldUsage := flag.Usage
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "\n%v version %v\n\n", os.Args[0], Version)
@@ -99,12 +99,12 @@ func main() {
 	}
 	flag.Parse()
 
-	whereUrl, err := url.Parse(where)
+	targetUrl, err := url.Parse(where)
 	if err != nil {
 		log.Fatalln("Fatal parsing -where:", err)
 	}
 
-	httpProxy := httputil.NewSingleHostReverseProxy(whereUrl)
+	httpProxy := httputil.NewSingleHostReverseProxy(targetUrl)
 
 	httpProxy.Transport = &ConnectionErrorHandler{&http.Transport{
 		TLSClientConfig: &tls.Config{
