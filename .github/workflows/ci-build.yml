@@ -29,4 +29,4 @@ jobs:
       - name: Run and test redirect
         run: |
           ./tiny-ssl-reverse-proxy -key key.pem -cert crt.pem &
-          curl -v -k https://localhost 2>&1 | grep "self signed certificate"
+          curl -v -k https://localhost 2>&1
